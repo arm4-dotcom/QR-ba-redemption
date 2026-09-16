@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>QR BA Redemption</title>
+
+  <!-- LINE LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+
+  <style>
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 30px 20px;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 420px;
+      margin: auto;
+      background: white;
+      padding: 30px 20px;
+      border-radius: 16px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    }
+
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+    }
+
+    #status {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f0f0f0;
+      border-radius: 10px;
+      line-height: 1.6;
+      word-break: break-word;
+    }
+
+    .success {
+      background: #e8f5e9 !important;
+    }
+
+    .error {
+      background: #ffebee !important;
+    }
+
+    .userid {
+      margin-top: 15px;
+      padding: 12px;
+      background: #eeeeee;
+      border-radius: 8px;
+      font-size: 13px;
+      word-break: break-all;
+      text-align: left;
+    }
+
+  </style>
+
+</head>
+
+
+<body>
+
+  <div class="container">
+
+    <h1>QR BA Redemption</h1>
+
+    <div id="status">
+      กำลังเริ่ม LIFF...
+    </div>
+
+    <div
+      id="userid"
+      class="userid"
+      style="display:none;"
+    ></div>
+
+  </div>
+
+
+<script>
+
+// ============================================================
+// CONFIG
+// ============================================================
+
+// LIFF ID
+const LIFF_ID = '2011608815-zoBVWfw9';
+
+// Google Apps Script Web App
+const GAS_URL =
+  'https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0kQo0WgVNAp18A1bQrxp-5Mly0csEA/exec';
+
+
+// ============================================================
+// ELEMENTS
+// ============================================================
+
+const statusBox =
+  document.getElementById('status');
+
+const userIdBox =
+  document.getElementById('userid');
+
+
+// ============================================================
+// START LIFF
+// ============================================================
+
+async function startLIFF() {
+
+  try {
+
+    // --------------------------------------------------------
+    // 1. Initialize LIFF
+    // --------------------------------------------------------
+
+    statusBox.innerText =
+      'กำลังเชื่อมต่อ LINE...';
+
+    await liff.init({
+      liffId: LIFF_ID
+    });
+
+
+    // --------------------------------------------------------
+    // 2. ตรวจสอบ Login
+    // --------------------------------------------------------
+
+    if (!liff.isLoggedIn()) {
+
+      statusBox.innerText =
+        'กำลังเข้าสู่ระบบ LINE...';
+
+      liff.login();
+
+      return;
+    }
+
+
+    // --------------------------------------------------------
+    // 3. ขอ ID Token
+    // --------------------------------------------------------
+
+    statusBox.innerText =
+      'กำลังตรวจสอบตัวตน...';
+
+    const idToken =
+      liff.getIDToken();
+
+
+    if (!idToken) {
+
+      throw new Error(
+        'ไม่สามารถรับ LINE ID Token ได้'
+      );
+
+    }
+
+
+    // --------------------------------------------------------
+    // 4. ส่ง ID Token ไปยัง GAS
+    // --------------------------------------------------------
+
+    statusBox.innerText =
+      'กำลังส่งข้อมูลไปยัง Server...';
+
+
+    const response =
+      await fetch(
+        GAS_URL,
+        {
+          method: 'POST',
+
+          headers: {
+            'Content-Type':
+              'text/plain;charset=utf-8'
+          },
+
+          body: JSON.stringify({
+            idToken: idToken
+          }),
+
+          redirect: 'follow'
+        }
+      );
+
+
+    // --------------------------------------------------------
+    // 5. อ่านผลจาก GAS
+    // --------------------------------------------------------
+
+    const result =
+      await response.json();
+
+
+    // --------------------------------------------------------
+    // 6. ตรวจสอบผล
+    // --------------------------------------------------------
+
+    if (!result.success) {
+
+      throw new Error(
+        result.message ||
+        'Server verification failed'
+      );
+
+    }
+
+
+    // --------------------------------------------------------
+    // 7. สำเร็จ
+    // --------------------------------------------------------
+
+    statusBox.innerText =
+      'ตรวจสอบ LINE User สำเร็จ';
+
+    statusBox.className =
+      'success';
+
+
+    // --------------------------------------------------------
+    // แสดง LINE User ID
+    // --------------------------------------------------------
+
+    userIdBox.style.display =
+      'block';
+
+    userIdBox.innerHTML =
+      '<strong>LINE User ID</strong><br>' +
+      result.lineUserId;
+
+
+    console.log(
+      'Verified LINE User ID:',
+      result.lineUserId
+    );
+
+
+  } catch (error) {
+
+    console.error(error);
+
+
+    statusBox.innerText =
+      'เกิดข้อผิดพลาด\n\n' +
+      error.message;
+
+    statusBox.className =
+      'error';
+
+  }
+
+}
+
+
+// ============================================================
+// RUN
+// ============================================================
+
+startLIFF();
+
+</script>
+
+</body>
+
+</html>
