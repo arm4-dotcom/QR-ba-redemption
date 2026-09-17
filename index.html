@@ -123,7 +123,7 @@ const LIFF_ID =
 
 // Google Apps Script Web App
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0qWgVNAp18A1bQrxp-5Mly0csEA/exec';
+  'https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0kQo0WgVNAp18A1bQrxp-5Mly0csEA/exec';
 
 
 // ============================================================
@@ -147,7 +147,7 @@ const qrInfoBox =
 function getQRId() {
 
   // ----------------------------------------------------------
-  // 1. ลองอ่าน qr จาก URL ปกติก่อน
+  // 1. อ่าน qr จาก URL ปกติ
   // ----------------------------------------------------------
 
   const params =
@@ -159,7 +159,9 @@ function getQRId() {
     params.get('qr');
 
   if (directQR) {
-    return directQR;
+
+    return directQR.trim();
+
   }
 
 
@@ -186,7 +188,9 @@ function getQRId() {
         stateParams.get('qr');
 
       if (stateQR) {
-        return stateQR;
+
+        return stateQR.trim();
+
       }
 
     } catch (error) {
@@ -220,6 +224,7 @@ function showQRInfo(qrId) {
     'block';
 
   qrInfoBox.innerHTML =
+
     '<strong>QR ID:</strong><br>' +
     qrId;
 
@@ -235,7 +240,22 @@ async function startLIFF() {
   try {
 
     // --------------------------------------------------------
-    // 1. อ่าน QR_ID จาก URL
+    // 1. Initialize LIFF ก่อน
+    // --------------------------------------------------------
+
+    statusBox.innerText =
+      'กำลังเชื่อมต่อ LINE...';
+
+    await liff.init({
+
+      liffId:
+        LIFF_ID
+
+    });
+
+
+    // --------------------------------------------------------
+    // 2. อ่าน QR_ID หลัง LIFF init
     // --------------------------------------------------------
 
     const qrId =
@@ -259,22 +279,8 @@ async function startLIFF() {
     }
 
 
+    // แสดง QR ที่ตรวจพบ
     showQRInfo(qrId);
-
-
-    // --------------------------------------------------------
-    // 2. Initialize LIFF
-    // --------------------------------------------------------
-
-    statusBox.innerText =
-      'กำลังเชื่อมต่อ LINE...';
-
-    await liff.init({
-
-      liffId:
-        LIFF_ID
-
-    });
 
 
     // --------------------------------------------------------
@@ -286,7 +292,12 @@ async function startLIFF() {
       statusBox.innerText =
         'กำลังเข้าสู่ระบบ LINE...';
 
-      liff.login();
+      liff.login({
+
+        redirectUri:
+          window.location.href
+
+      });
 
       return;
 
