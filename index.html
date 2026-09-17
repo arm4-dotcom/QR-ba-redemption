@@ -146,12 +146,66 @@ const qrInfoBox =
 
 function getQRId() {
 
+  // ----------------------------------------------------------
+  // 1. ลองอ่าน qr จาก URL ปกติก่อน
+  // ----------------------------------------------------------
+
   const params =
     new URLSearchParams(
       window.location.search
     );
 
-  return params.get('qr');
+  const directQR =
+    params.get('qr');
+
+  if (directQR) {
+    return directQR;
+  }
+
+
+  // ----------------------------------------------------------
+  // 2. กรณี LINE LIFF เก็บ parameter ไว้ใน liff.state
+  // ----------------------------------------------------------
+
+  const liffState =
+    params.get('liff.state');
+
+  if (liffState) {
+
+    try {
+
+      const decodedState =
+        decodeURIComponent(liffState);
+
+      const stateParams =
+        new URLSearchParams(
+          decodedState
+        );
+
+      const stateQR =
+        stateParams.get('qr');
+
+      if (stateQR) {
+        return stateQR;
+      }
+
+    } catch (error) {
+
+      console.error(
+        'Cannot parse liff.state:',
+        error
+      );
+
+    }
+
+  }
+
+
+  // ----------------------------------------------------------
+  // 3. ไม่พบ QR
+  // ----------------------------------------------------------
+
+  return null;
 
 }
 
