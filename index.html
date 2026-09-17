@@ -15,6 +15,7 @@
   <!-- LINE LIFF SDK -->
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
+
   <style>
 
     body {
@@ -46,6 +47,7 @@
       border-radius: 10px;
       line-height: 1.6;
       word-break: break-word;
+      white-space: pre-line;
     }
 
     .success {
@@ -54,6 +56,16 @@
 
     .error {
       background: #ffebee !important;
+    }
+
+    .info {
+      margin-top: 15px;
+      padding: 12px;
+      background: #eeeeee;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 1.6;
+      text-align: left;
     }
 
     .userid {
@@ -81,6 +93,14 @@
       กำลังเริ่ม LIFF...
     </div>
 
+
+    <div
+      id="qrinfo"
+      class="info"
+      style="display:none;"
+    ></div>
+
+
     <div
       id="userid"
       class="userid"
@@ -97,11 +117,13 @@
 // ============================================================
 
 // LIFF ID
-const LIFF_ID = '2011608815-zoBVWfw9';
+const LIFF_ID =
+  '2011608815-zoBVWfw9';
+
 
 // Google Apps Script Web App
 const GAS_URL =
-  'https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0kQo0WgVNAp18A1bQrxp-5Mly0csEA/exec';
+  'https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0qWgVNAp18A1bQrxp-5Mly0csEA/exec';
 
 
 // ============================================================
@@ -114,6 +136,41 @@ const statusBox =
 const userIdBox =
   document.getElementById('userid');
 
+const qrInfoBox =
+  document.getElementById('qrinfo');
+
+
+// ============================================================
+// GET QR_ID FROM URL
+// ============================================================
+
+function getQRId() {
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  return params.get('qr');
+
+}
+
+
+// ============================================================
+// DISPLAY QR INFORMATION
+// ============================================================
+
+function showQRInfo(qrId) {
+
+  qrInfoBox.style.display =
+    'block';
+
+  qrInfoBox.innerHTML =
+    '<strong>QR ID:</strong><br>' +
+    qrId;
+
+}
+
 
 // ============================================================
 // START LIFF
@@ -124,19 +181,50 @@ async function startLIFF() {
   try {
 
     // --------------------------------------------------------
-    // 1. Initialize LIFF
+    // 1. อ่าน QR_ID จาก URL
+    // --------------------------------------------------------
+
+    const qrId =
+      getQRId();
+
+
+    // --------------------------------------------------------
+    // ตรวจสอบ QR_ID
+    // --------------------------------------------------------
+
+    if (!qrId) {
+
+      statusBox.innerText =
+        'ไม่พบ QR_ID\n\nกรุณาเปิดผ่าน QR Code ที่ถูกต้อง';
+
+      statusBox.className =
+        'error';
+
+      return;
+
+    }
+
+
+    showQRInfo(qrId);
+
+
+    // --------------------------------------------------------
+    // 2. Initialize LIFF
     // --------------------------------------------------------
 
     statusBox.innerText =
       'กำลังเชื่อมต่อ LINE...';
 
     await liff.init({
-      liffId: LIFF_ID
+
+      liffId:
+        LIFF_ID
+
     });
 
 
     // --------------------------------------------------------
-    // 2. ตรวจสอบ Login
+    // 3. ตรวจสอบ Login
     // --------------------------------------------------------
 
     if (!liff.isLoggedIn()) {
@@ -147,11 +235,12 @@ async function startLIFF() {
       liff.login();
 
       return;
+
     }
 
 
     // --------------------------------------------------------
-    // 3. ขอ ID Token
+    // 4. ขอ ID Token
     // --------------------------------------------------------
 
     statusBox.innerText =
@@ -171,7 +260,7 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // 4. ส่ง ID Token ไปยัง GAS
+    // 5. ส่ง ID Token + QR_ID ไปยัง GAS
     // --------------------------------------------------------
 
     statusBox.innerText =
@@ -180,52 +269,75 @@ async function startLIFF() {
 
     const response =
       await fetch(
+
         GAS_URL,
+
         {
+
           method: 'POST',
 
           headers: {
+
             'Content-Type':
               'text/plain;charset=utf-8'
+
           },
 
-          body: JSON.stringify({
-            idToken: idToken
-          }),
+          body:
+            JSON.stringify({
 
-          redirect: 'follow'
+              idToken:
+                idToken,
+
+              qrId:
+                qrId
+
+            }),
+
+          redirect:
+            'follow'
+
         }
+
       );
 
 
     // --------------------------------------------------------
-    // 5. อ่านผลจาก GAS
+    // 6. อ่านผลจาก GAS
     // --------------------------------------------------------
 
     const result =
       await response.json();
 
 
+    console.log(
+      'Server response:',
+      result
+    );
+
+
     // --------------------------------------------------------
-    // 6. ตรวจสอบผล
+    // 7. ตรวจสอบผล
     // --------------------------------------------------------
 
     if (!result.success) {
 
       throw new Error(
+
         result.message ||
         'Server verification failed'
+
       );
 
     }
 
 
     // --------------------------------------------------------
-    // 7. สำเร็จ
+    // 8. แสดงผลสำเร็จ
     // --------------------------------------------------------
 
     statusBox.innerText =
-      'ตรวจสอบ LINE User สำเร็จ';
+      'ตรวจสอบ LINE User และ QR สำเร็จ';
 
     statusBox.className =
       'success';
@@ -239,13 +351,72 @@ async function startLIFF() {
       'block';
 
     userIdBox.innerHTML =
+
       '<strong>LINE User ID</strong><br>' +
+
       result.lineUserId;
 
+
+    // --------------------------------------------------------
+    // แสดงข้อมูล BA / Store
+    // --------------------------------------------------------
+
+    if (result.ba) {
+
+      const ba =
+        result.ba;
+
+
+      qrInfoBox.innerHTML =
+
+        '<strong>QR ID:</strong> ' +
+        (ba.QR_ID || '-') +
+
+        '<br><br>' +
+
+        '<strong>BA ID:</strong> ' +
+        (ba.BA_ID || '-') +
+
+        '<br>' +
+
+        '<strong>BA Name:</strong> ' +
+        (ba.BA_NAME || '-') +
+
+        '<br><br>' +
+
+        '<strong>Store ID:</strong> ' +
+        (ba.STORE_ID || '-') +
+
+        '<br>' +
+
+        '<strong>Store Name:</strong> ' +
+        (ba.STORE_NAME || '-') +
+
+        '<br><br>' +
+
+        '<strong>Province:</strong> ' +
+        (ba.PROVINCE || '-') +
+
+        '<br>' +
+
+        '<strong>QR Status:</strong> ' +
+        (ba.QR_STATUS || '-');
+
+    }
+
+
+    // --------------------------------------------------------
+    // Console
+    // --------------------------------------------------------
 
     console.log(
       'Verified LINE User ID:',
       result.lineUserId
+    );
+
+    console.log(
+      'Verified QR:',
+      result.ba
     );
 
 
