@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="th">
 
 <head>
@@ -19,7 +20,7 @@
     }
 
     .container {
-      max-width: 500px;
+      max-width: 600px;
       margin: 40px auto;
       background: #ffffff;
       padding: 30px;
@@ -90,29 +91,40 @@
       font-weight: bold;
     }
 
+    .raw-response {
+      margin-top: 8px;
+      padding: 10px;
+      background: #eeeeee;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
   </style>
 
 </head>
-
 
 <body>
 
   <div class="container">
 
-    <h1>QR BA Redemption</h1>
+```
+<h1>QR BA Redemption</h1>
 
-    <div class="test-title">
-      Idempotency / Double Submit Test
-    </div>
+<div class="test-title">
+  Idempotency / Double Submit Test
+</div>
 
-    <div id="status" class="status">
-      กำลังเริ่มการทดสอบ...
-    </div>
+<div id="status" class="status">
+  กำลังเริ่มการทดสอบ...
+</div>
 
-    <div id="result" style="display:none;"></div>
+<div id="result" style="display:none;"></div>
+```
 
   </div>
-
 
   <script>
 
@@ -198,13 +210,7 @@
 
 
         // -------------------------------------------------------
-        // IMPORTANT
-        // -------------------------------------------------------
-        //
-        // สร้างเพียง 1 Key
-        //
-        // แล้วใช้ Key เดิมกับ Request #1 และ #2
-        //
+        // สร้าง IDEMPOTENCY_KEY เพียงครั้งเดียว
         // -------------------------------------------------------
 
         const idempotencyKey =
@@ -239,15 +245,15 @@
         );
 
 
+        // =======================================================
+        // REQUEST #1
+        // =======================================================
+
         setStatus(
           "กำลังส่ง Request #1...",
           "normal"
         );
 
-
-        // =======================================================
-        // REQUEST #1
-        // =======================================================
 
         const result1 =
           await sendTransaction({
@@ -268,10 +274,14 @@
 
 
         console.log(
-          "REQUEST #1 RESULT:",
+          "REQUEST #1 NORMALIZED RESULT:",
           result1
         );
 
+
+        // -------------------------------------------------------
+        // ต้องสำเร็จจริง
+        // -------------------------------------------------------
 
         if (!result1.success) {
 
@@ -293,11 +303,6 @@
         // =======================================================
         // REQUEST #2
         // =======================================================
-        //
-        // สำคัญ:
-        // ใช้ idempotencyKey เดิม
-        //
-        // =======================================================
 
         const result2 =
           await sendTransaction({
@@ -318,16 +323,18 @@
 
 
         console.log(
-          "REQUEST #2 RESULT:",
+          "REQUEST #2 NORMALIZED RESULT:",
           result2
         );
 
 
         // =======================================================
-        // VALIDATE TEST
+        // VALIDATE
         // =======================================================
 
         const sameClaimId =
+          result1.claimId &&
+          result2.claimId &&
           result1.claimId ===
           result2.claimId;
 
@@ -418,7 +425,10 @@
       }
       catch (error) {
 
-        console.error(error);
+        console.error(
+          "TEST ERROR:",
+          error
+        );
 
         showError(
           error.message ||
@@ -432,6 +442,12 @@
 
     // =========================================================
     // SEND TRANSACTION
+    //
+    // จุดสำคัญ:
+    // อ่าน response เป็น text ก่อน
+    // แล้วค่อย JSON.parse()
+    //
+    // เพื่อให้เห็น Response จริงจาก GAS
     // =========================================================
 
     async function sendTransaction(data) {
@@ -448,13 +464,112 @@
                 "text/plain;charset=utf-8"
             },
 
-            body: JSON.stringify(data)
+            body:
+              JSON.stringify(data)
 
           }
         );
 
 
-      return await response.json();
+      // -------------------------------------------------------
+      // อ่าน Response ดิบ
+      // -------------------------------------------------------
+
+      const rawText =
+        await response.text();
+
+
+      console.log(
+        "GAS HTTP STATUS:",
+        response.status
+      );
+
+
+      console.log(
+        "GAS RAW RESPONSE:",
+        rawText
+      );
+
+
+      if (!rawText) {
+
+        throw new Error(
+          "GAS ส่ง Response ว่างกลับมา"
+        );
+
+      }
+
+
+      // -------------------------------------------------------
+      // Parse JSON
+      // -------------------------------------------------------
+
+      let parsed;
+
+      try {
+
+        parsed =
+          JSON.parse(rawText);
+
+      }
+      catch (error) {
+
+        console.error(
+          "JSON PARSE ERROR:",
+          error
+        );
+
+        throw new Error(
+          "GAS Response ไม่ใช่ JSON: " +
+          rawText.substring(0, 300)
+        );
+
+      }
+
+
+      console.log(
+        "GAS PARSED RESPONSE:",
+        parsed
+      );
+
+
+      // =======================================================
+      // รองรับทั้ง:
+      //
+      // {
+      //   success: true,
+      //   claimId: "...",
+      //   isDuplicate: false
+      // }
+      //
+      // และกรณี:
+      //
+      // {
+      //   data: {
+      //     success: true,
+      //     claimId: "...",
+      //     isDuplicate: false
+      //   }
+      // }
+      // =======================================================
+
+      const result =
+        parsed &&
+        parsed.data &&
+        typeof parsed.data === "object"
+          ? parsed.data
+          : parsed;
+
+
+      // -------------------------------------------------------
+      // เก็บ Raw Response ไว้สำหรับ Debug
+      // -------------------------------------------------------
+
+      result._rawResponse =
+        rawText;
+
+
+      return result;
 
     }
 
@@ -501,7 +616,6 @@
 
         <div class="test-box">
 
-
           <div class="test-row">
 
             <span class="label">
@@ -541,6 +655,16 @@
 
             </span>
 
+            <div class="raw-response">
+
+              RAW RESPONSE #1:
+
+              ${escapeHtml(
+                data.result1._rawResponse || ""
+              )}
+
+            </div>
+
           </div>
 
 
@@ -567,6 +691,16 @@
               )}
 
             </span>
+
+            <div class="raw-response">
+
+              RAW RESPONSE #2:
+
+              ${escapeHtml(
+                data.result2._rawResponse || ""
+              )}
+
+            </div>
 
           </div>
 
