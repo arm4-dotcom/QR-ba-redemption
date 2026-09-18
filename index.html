@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="th">
 
 <head>
@@ -74,25 +73,36 @@
       word-break: break-word;
     }
 
+    .debug-box {
+      margin-top: 20px;
+      padding: 15px;
+      background: #eeeeee;
+      border-radius: 8px;
+      font-size: 12px;
+      word-break: break-word;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
   </style>
 
 </head>
+
 
 <body>
 
   <div class="container">
 
-```
-<h1>QR BA Redemption</h1>
+    <h1>QR BA Redemption</h1>
 
-<div id="status" class="status">
-  กำลังตรวจสอบข้อมูล...
-</div>
+    <div id="status" class="status">
+      กำลังตรวจสอบข้อมูล...
+    </div>
 
-<div id="result" style="display:none;"></div>
-```
+    <div id="result" style="display:none;"></div>
 
   </div>
+
 
   <script>
 
@@ -140,7 +150,6 @@
           liff.login();
 
           return;
-
         }
 
 
@@ -172,42 +181,29 @@
 
 
         const qrId =
-          params.get("qrId") || "QR01";
+          params.get("qrId") ||
+          "QR01";
 
 
         const campaignId =
-          params.get("campaignId") || "CAMP01";
+          params.get("campaignId") ||
+          "CAMP01";
 
 
-        // =======================================================
-        // CREATE IDEMPOTENCY KEY
-        // =======================================================
+        // -------------------------------------------------------
+        // Create Idempotency Key
+        // -------------------------------------------------------
         //
         // 1 transaction attempt = 1 unique key
         //
-        // ใช้สำหรับ:
-        // - ป้องกัน Double Submit
-        // - ป้องกันการส่ง Request เดิมซ้ำ
+        // ใช้สำหรับป้องกัน Double Submit / Network Retry
         //
-        // ไม่ใช้:
-        // LINE_USER_ID + CAMPAIGN_ID
+        // ไม่ใช้ LINE_USER_ID + CAMPAIGN_ID
         //
-        // ไม่เกี่ยวกับ LIMIT_PER_USER
-        //
-        // =======================================================
+        // -------------------------------------------------------
 
         const idempotencyKey =
           crypto.randomUUID();
-
-
-        console.log(
-          "================================="
-        );
-
-
-        console.log(
-          "QR BA REDEMPTION"
-        );
 
 
         console.log(
@@ -228,11 +224,6 @@
         );
 
 
-        console.log(
-          "================================="
-        );
-
-
         // -------------------------------------------------------
         // Show Processing
         // -------------------------------------------------------
@@ -244,26 +235,112 @@
 
 
         // =======================================================
-        // SEND TRANSACTION
+        // Send Transaction to Google Apps Script
         // =======================================================
 
-        const result =
-          await sendTransaction({
+        const response =
+          await fetch(
+            GAS_URL,
+            {
 
-            idToken:
-              idToken,
+              method: "POST",
 
-            qrId:
-              qrId,
+              headers: {
 
-            campaignId:
-              campaignId,
+                "Content-Type":
+                  "text/plain;charset=utf-8"
 
-            idempotencyKey:
-              idempotencyKey
+              },
 
-          });
+              body:
+                JSON.stringify({
 
+                  idToken:
+                    idToken,
+
+                  qrId:
+                    qrId,
+
+                  campaignId:
+                    campaignId,
+
+                  idempotencyKey:
+                    idempotencyKey
+
+                })
+
+            }
+          );
+
+
+        // =======================================================
+        // READ RAW RESPONSE
+        // =======================================================
+        //
+        // สำคัญ:
+        // ไม่ใช้ response.json() โดยตรง
+        //
+        // อ่านเป็น text ก่อน
+        // แล้วค่อย JSON.parse()
+        //
+        // เพื่อป้องกันกรณี Browser ได้ Response
+        // ที่ไม่ใช่ JSON
+        //
+        // =======================================================
+
+        const rawResponse =
+          await response.text();
+
+
+        console.log(
+          "GAS HTTP Status:",
+          response.status
+        );
+
+
+        console.log(
+          "GAS Raw Response:",
+          rawResponse
+        );
+
+
+        // =======================================================
+        // PARSE JSON
+        // =======================================================
+
+        let result;
+
+
+        try {
+
+          result =
+            JSON.parse(
+              rawResponse
+            );
+
+        }
+        catch (parseError) {
+
+          console.error(
+            "JSON Parse Error:",
+            parseError
+          );
+
+
+          showRawResponseError(
+            rawResponse,
+            response.status
+          );
+
+
+          return;
+
+        }
+
+
+        // =======================================================
+        // GAS RESPONSE
+        // =======================================================
 
         console.log(
           "GAS Response:",
@@ -271,9 +348,9 @@
         );
 
 
-        // -------------------------------------------------------
-        // Backend Error
-        // -------------------------------------------------------
+        // =======================================================
+        // HANDLE BACKEND ERROR
+        // =======================================================
 
         if (!result.success) {
 
@@ -286,18 +363,19 @@
         }
 
 
-        // -------------------------------------------------------
+        // =======================================================
         // SUCCESS
-        // -------------------------------------------------------
+        // =======================================================
 
-        showSuccess(result);
+        showSuccess(
+          result
+        );
 
 
       }
       catch (error) {
 
         console.error(
-          "QR BA Redemption Error:",
           error
         );
 
@@ -313,110 +391,12 @@
 
 
     // =========================================================
-    // SEND TRANSACTION
-    //
-    // อ่าน Response เป็น text ก่อน
-    // แล้วค่อย JSON.parse()
-    //
-    // ใช้แนวเดียวกับ Test Mode ที่ผ่านแล้ว
-    // =========================================================
-
-    async function sendTransaction(data) {
-
-      const response =
-        await fetch(
-          GAS_URL,
-          {
-
-            method: "POST",
-
-            headers: {
-
-              "Content-Type":
-                "text/plain;charset=utf-8"
-
-            },
-
-            body:
-              JSON.stringify(data)
-
-          }
-        );
-
-
-      // -------------------------------------------------------
-      // Read Raw Response
-      // -------------------------------------------------------
-
-      const rawText =
-        await response.text();
-
-
-      console.log(
-        "GAS HTTP STATUS:",
-        response.status
-      );
-
-
-      console.log(
-        "GAS RAW RESPONSE:",
-        rawText
-      );
-
-
-      if (!rawText) {
-
-        throw new Error(
-          "GAS ส่ง Response ว่างกลับมา"
-        );
-
-      }
-
-
-      // -------------------------------------------------------
-      // Parse JSON
-      // -------------------------------------------------------
-
-      let result;
-
-
-      try {
-
-        result =
-          JSON.parse(rawText);
-
-      }
-      catch (error) {
-
-        console.error(
-          "JSON Parse Error:",
-          error
-        );
-
-
-        throw new Error(
-          "GAS Response ไม่ใช่ JSON"
-        );
-
-      }
-
-
-      console.log(
-        "GAS PARSED RESPONSE:",
-        result
-      );
-
-
-      return result;
-
-    }
-
-
-    // =========================================================
     // SHOW SUCCESS
     // =========================================================
 
-    function showSuccess(result) {
+    function showSuccess(
+      result
+    ) {
 
       const status =
         document.getElementById(
@@ -430,35 +410,12 @@
         );
 
 
-      // -------------------------------------------------------
-      // ตรวจว่าเป็น Transaction ใหม่
-      // หรือ Duplicate Request
-      // -------------------------------------------------------
-
-      const isDuplicate =
-        result.isDuplicate === true;
+      status.className =
+        "status success";
 
 
-      if (isDuplicate) {
-
-        status.className =
-          "status success";
-
-
-        status.textContent =
-          "รายการนี้ดำเนินการไปแล้ว";
-
-      }
-      else {
-
-        status.className =
-          "status success";
-
-
-        status.textContent =
-          "ทำรายการสำเร็จ";
-
-      }
+      status.textContent =
+        "ทำรายการสำเร็จ";
 
 
       // -------------------------------------------------------
@@ -466,7 +423,8 @@
       // -------------------------------------------------------
 
       const campaign =
-        result.campaign || {};
+        result.campaign ||
+        {};
 
 
       // -------------------------------------------------------
@@ -474,7 +432,8 @@
       // -------------------------------------------------------
 
       const ba =
-        result.ba || {};
+        result.ba ||
+        {};
 
 
       // -------------------------------------------------------
@@ -526,16 +485,6 @@
           storeName;
 
       }
-
-
-      // -------------------------------------------------------
-      // Transaction Status
-      // -------------------------------------------------------
-
-      const transactionStatus =
-        isDuplicate
-          ? "ALREADY_PROCESSED"
-          : "SUCCESS";
 
 
       // -------------------------------------------------------
@@ -630,7 +579,8 @@
 
             <span class="value">
               ${escapeHtml(
-                transactionStatus
+                result.status ||
+                "SUCCESS"
               )}
             </span>
 
@@ -652,7 +602,9 @@
     // SHOW ERROR
     // =========================================================
 
-    function showError(message) {
+    function showError(
+      message
+    ) {
 
       const status =
         document.getElementById(
@@ -666,6 +618,76 @@
 
       status.textContent =
         message;
+
+    }
+
+
+    // =========================================================
+    // SHOW RAW RESPONSE ERROR
+    // =========================================================
+    //
+    // ใช้กรณี GAS ส่งข้อมูลกลับมา
+    // แต่ไม่ใช่ JSON
+    //
+    // =========================================================
+
+    function showRawResponseError(
+      rawResponse,
+      httpStatus
+    ) {
+
+      const status =
+        document.getElementById(
+          "status"
+        );
+
+
+      const resultBox =
+        document.getElementById(
+          "result"
+        );
+
+
+      status.className =
+        "status error";
+
+
+      status.textContent =
+        "GAS Response ไม่ใช่ JSON";
+
+
+      resultBox.innerHTML = `
+
+        <div class="debug-box">
+
+          <strong>
+            HTTP Status:
+          </strong>
+
+          ${escapeHtml(
+            String(httpStatus)
+          )}
+
+          <br><br>
+
+          <strong>
+            RAW RESPONSE:
+          </strong>
+
+          <br><br>
+
+          ${escapeHtml(
+            rawResponse ||
+            "(empty response)"
+          )}
+
+        </div>
+
+      `;
+
+
+      resultBox.style.display =
+        "block";
 
     }
 
@@ -689,7 +711,9 @@
         "status";
 
 
-      if (type === "success") {
+      if (
+        type === "success"
+      ) {
 
         status.classList.add(
           "success"
@@ -698,7 +722,9 @@
       }
 
 
-      if (type === "error") {
+      if (
+        type === "error"
+      ) {
 
         status.classList.add(
           "error"
@@ -717,7 +743,9 @@
     // HTML ESCAPE
     // =========================================================
 
-    function escapeHtml(value) {
+    function escapeHtml(
+      value
+    ) {
 
       return String(value)
 
