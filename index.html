@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-
 <html lang="th">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,6 +10,7 @@
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
   <style>
+
     body {
       font-family: Arial, sans-serif;
       background: #f5f5f5;
@@ -72,422 +73,545 @@
       word-break: break-word;
     }
 
-    button {
-      width: 100%;
-      padding: 12px;
-      border: none;
-      border-radius: 8px;
-      background: #06c755;
-      color: white;
-      font-size: 16px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      background: #cccccc;
-      cursor: not-allowed;
-    }
   </style>
 
 </head>
 
+
 <body>
 
-<div class="container">
+  <div class="container">
 
-  <h1>QR BA Redemption</h1>
+    <h1>QR BA Redemption</h1>
 
-  <div id="status" class="status">
-    กำลังตรวจสอบข้อมูล...
+    <div id="status" class="status">
+      กำลังตรวจสอบข้อมูล...
+    </div>
+
+    <div id="result" style="display:none;"></div>
+
   </div>
 
-  <div id="result" style="display:none;"></div>
 
-</div>
+  <script>
 
-<script>
+    // =========================================================
+    // CONFIG
+    // =========================================================
 
-  // =========================================================
-  // CONFIG
-  // =========================================================
+    const LIFF_ID = "2011608815-zoBVWfw9";
 
-  const LIFF_ID = "2011608815-zoBVWfw9";
-
-  const GAS_URL =
-    "https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0kQo0WgVNAp18A1bQrxp-5Mly0csEA/exec";
+    const GAS_URL =
+      "https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0kQo0WgVNAp18A1bQrxp-5Mly0csEA/exec";
 
 
-  // =========================================================
-  // START
-  // =========================================================
+    // =========================================================
+    // START
+    // =========================================================
 
-  window.onload = async function () {
+    window.onload = async function () {
 
-    try {
+      try {
 
-      setStatus("กำลังเริ่มระบบ...", "normal");
-
-      // -------------------------------------------------------
-      // Initialize LIFF
-      // -------------------------------------------------------
-
-      await liff.init({
-        liffId: LIFF_ID
-      });
-
-
-      // -------------------------------------------------------
-      // Check LINE Login
-      // -------------------------------------------------------
-
-      if (!liff.isLoggedIn()) {
-
-        liff.login();
-
-        return;
-      }
-
-
-      // -------------------------------------------------------
-      // Get ID Token
-      // -------------------------------------------------------
-
-      const idToken = liff.getIDToken();
-
-      if (!idToken) {
-
-        throw new Error("ไม่สามารถรับ LINE ID Token ได้");
-      }
-
-
-      // -------------------------------------------------------
-      // Get URL Parameters
-      // -------------------------------------------------------
-
-      const params = new URLSearchParams(window.location.search);
-
-      const qrId = params.get("qrId") || "QR01";
-
-      const campaignId =
-        params.get("campaignId") || "CAMP01";
-
-
-      // -------------------------------------------------------
-      // Create Idempotency Key
-      // -------------------------------------------------------
-      //
-      // 1 transaction attempt = 1 unique key
-      //
-      // หากเกิด double-click / network retry
-      // request เดิมสามารถใช้ key เดิมเพื่อป้องกัน
-      // การสร้าง CLAIM ซ้ำ
-      //
-      // -------------------------------------------------------
-
-      const idempotencyKey = crypto.randomUUID();
-
-
-      console.log("QR ID:", qrId);
-
-      console.log("Campaign ID:", campaignId);
-
-      console.log(
-        "Idempotency Key:",
-        idempotencyKey
-      );
-
-
-      // -------------------------------------------------------
-      // Send Transaction to GAS
-      // -------------------------------------------------------
-
-      setStatus(
-        "กำลังดำเนินการรายการ...",
-        "normal"
-      );
-
-
-      const response = await fetch(GAS_URL, {
-
-        method: "POST",
-
-        headers: {
-          "Content-Type": "text/plain;charset=utf-8"
-        },
-
-        body: JSON.stringify({
-
-          idToken: idToken,
-
-          qrId: qrId,
-
-          campaignId: campaignId,
-
-          idempotencyKey: idempotencyKey
-
-        })
-
-      });
-
-
-      // -------------------------------------------------------
-      // Parse Response
-      // -------------------------------------------------------
-
-      const result = await response.json();
-
-
-      console.log(
-        "GAS Response:",
-        result
-      );
-
-
-      // -------------------------------------------------------
-      // Handle Error
-      // -------------------------------------------------------
-
-      if (!result.success) {
-
-        throw new Error(
-          result.message ||
-          result.error ||
-          "ไม่สามารถทำรายการได้"
+        setStatus(
+          "กำลังเริ่มระบบ...",
+          "normal"
         );
+
+
+        // -------------------------------------------------------
+        // Initialize LIFF
+        // -------------------------------------------------------
+
+        await liff.init({
+          liffId: LIFF_ID
+        });
+
+
+        // -------------------------------------------------------
+        // Check LINE Login
+        // -------------------------------------------------------
+
+        if (!liff.isLoggedIn()) {
+
+          liff.login();
+
+          return;
+        }
+
+
+        // -------------------------------------------------------
+        // Get LINE ID Token
+        // -------------------------------------------------------
+
+        const idToken = liff.getIDToken();
+
+        if (!idToken) {
+
+          throw new Error(
+            "ไม่สามารถรับ LINE ID Token ได้"
+          );
+        }
+
+
+        // -------------------------------------------------------
+        // Get URL Parameters
+        // -------------------------------------------------------
+
+        const params =
+          new URLSearchParams(
+            window.location.search
+          );
+
+
+        const qrId =
+          params.get("qrId") || "QR01";
+
+
+        const campaignId =
+          params.get("campaignId") || "CAMP01";
+
+
+        // -------------------------------------------------------
+        // Create Idempotency Key
+        // -------------------------------------------------------
+        //
+        // 1 transaction attempt = 1 unique key
+        //
+        // ใช้สำหรับป้องกัน Double Submit / Network Retry
+        //
+        // ไม่ใช้ LINE_USER_ID + CAMPAIGN_ID
+        //
+        // -------------------------------------------------------
+
+        const idempotencyKey =
+          crypto.randomUUID();
+
+
+        console.log(
+          "QR ID:",
+          qrId
+        );
+
+
+        console.log(
+          "Campaign ID:",
+          campaignId
+        );
+
+
+        console.log(
+          "Idempotency Key:",
+          idempotencyKey
+        );
+
+
+        // -------------------------------------------------------
+        // Show Processing
+        // -------------------------------------------------------
+
+        setStatus(
+          "กำลังดำเนินการรายการ...",
+          "normal"
+        );
+
+
+        // -------------------------------------------------------
+        // Send Transaction to Google Apps Script
+        // -------------------------------------------------------
+
+        const response =
+          await fetch(
+            GAS_URL,
+            {
+
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "text/plain;charset=utf-8"
+              },
+
+              body: JSON.stringify({
+
+                idToken: idToken,
+
+                qrId: qrId,
+
+                campaignId: campaignId,
+
+                idempotencyKey:
+                  idempotencyKey
+
+              })
+
+            }
+          );
+
+
+        // -------------------------------------------------------
+        // Parse Response
+        // -------------------------------------------------------
+
+        const result =
+          await response.json();
+
+
+        console.log(
+          "GAS Response:",
+          result
+        );
+
+
+        // -------------------------------------------------------
+        // Handle Backend Error
+        // -------------------------------------------------------
+
+        if (!result.success) {
+
+          throw new Error(
+            result.message ||
+            result.error ||
+            "ไม่สามารถทำรายการได้"
+          );
+
+        }
+
+
+        // -------------------------------------------------------
+        // SUCCESS
+        // -------------------------------------------------------
+
+        showSuccess(result);
+
+
+      }
+      catch (error) {
+
+        console.error(error);
+
+        showError(
+          error.message ||
+          "เกิดข้อผิดพลาดในการทำรายการ"
+        );
+
+      }
+
+    };
+
+
+    // =========================================================
+    // SHOW SUCCESS
+    // =========================================================
+
+    function showSuccess(result) {
+
+      const status =
+        document.getElementById(
+          "status"
+        );
+
+
+      const resultBox =
+        document.getElementById(
+          "result"
+        );
+
+
+      status.className =
+        "status success";
+
+
+      status.textContent =
+        "ทำรายการสำเร็จ";
+
+
+      // -------------------------------------------------------
+      // Campaign
+      // -------------------------------------------------------
+
+      const campaign =
+        result.campaign || {};
+
+
+      // -------------------------------------------------------
+      // BA
+      // -------------------------------------------------------
+
+      const ba =
+        result.ba || {};
+
+
+      // -------------------------------------------------------
+      // BA NAME
+      // -------------------------------------------------------
+      //
+      // BA_MASTER ใช้ BA_NAME
+      //
+      // fallback เป็น baName เผื่อ Backend ส่ง camelCase
+      //
+      // -------------------------------------------------------
+
+      const baName =
+        ba.BA_NAME ||
+        ba.baName ||
+        "-";
+
+
+      // -------------------------------------------------------
+      // STORE ID
+      // -------------------------------------------------------
+
+      const storeId =
+        ba.STORE_ID ||
+        ba.storeId ||
+        "-";
+
+
+      // -------------------------------------------------------
+      // Store Name
+      // -------------------------------------------------------
+
+      const storeName =
+        ba.STORE_NAME ||
+        ba.storeName ||
+        "";
+
+
+      // -------------------------------------------------------
+      // Display Store
+      // -------------------------------------------------------
+
+      let storeDisplay =
+        storeId;
+
+
+      if (
+        storeName &&
+        storeName !== "-"
+      ) {
+
+        storeDisplay =
+          storeId +
+          " - " +
+          storeName;
+
       }
 
 
       // -------------------------------------------------------
-      // SUCCESS
+      // Build Result
       // -------------------------------------------------------
 
-      showSuccess(result);
+      resultBox.innerHTML = `
+
+        <div class="detail">
 
 
-    } catch (error) {
+          <div class="detail-row">
 
-      console.error(error);
+            <span class="label">
+              Claim ID
+            </span>
 
-      showError(
-        error.message ||
-        "เกิดข้อผิดพลาดในการทำรายการ"
-      );
+            <span class="value">
+              ${escapeHtml(
+                result.claimId || "-"
+              )}
+            </span>
 
-    }
-
-  };
-
-
-  // =========================================================
-  // SHOW SUCCESS
-  // =========================================================
-
-  function showSuccess(result) {
-
-    const status =
-      document.getElementById("status");
-
-    const resultBox =
-      document.getElementById("result");
+          </div>
 
 
-    status.className =
-      "status success";
+          <div class="detail-row">
 
-    status.textContent =
-      "ทำรายการสำเร็จ";
+            <span class="label">
+              Campaign
+            </span>
+
+            <span class="value">
+              ${escapeHtml(
+                campaign.campaignName || "-"
+              )}
+            </span>
+
+          </div>
 
 
-    const campaign =
-      result.campaign || {};
+          <div class="detail-row">
 
-    const ba =
-      result.ba || {};
+            <span class="label">
+              Product
+            </span>
+
+            <span class="value">
+              ${escapeHtml(
+                campaign.product || "-"
+              )}
+            </span>
+
+          </div>
 
 
-    resultBox.innerHTML = `
+          <div class="detail-row">
 
-      <div class="detail">
+            <span class="label">
+              BA
+            </span>
 
-        <div class="detail-row">
+            <span class="value">
+              ${escapeHtml(
+                baName
+              )}
+            </span>
 
-          <span class="label">
-            Claim ID
-          </span>
+          </div>
 
-          <span class="value">
-            ${escapeHtml(
-              result.claimId || "-"
-            )}
-          </span>
+
+          <div class="detail-row">
+
+            <span class="label">
+              Store
+            </span>
+
+            <span class="value">
+              ${escapeHtml(
+                storeDisplay
+              )}
+            </span>
+
+          </div>
+
+
+          <div class="detail-row">
+
+            <span class="label">
+              Status
+            </span>
+
+            <span class="value">
+              ${escapeHtml(
+                result.status ||
+                "SUCCESS"
+              )}
+            </span>
+
+          </div>
+
 
         </div>
 
-
-        <div class="detail-row">
-
-          <span class="label">
-            Campaign
-          </span>
-
-          <span class="value">
-            ${escapeHtml(
-              campaign.campaignName || "-"
-            )}
-          </span>
-
-        </div>
+      `;
 
 
-        <div class="detail-row">
-
-          <span class="label">
-            Product
-          </span>
-
-          <span class="value">
-            ${escapeHtml(
-              campaign.product || "-"
-            )}
-          </span>
-
-        </div>
-
-
-        <div class="detail-row">
-
-          <span class="label">
-            BA
-          </span>
-
-          <span class="value">
-            ${escapeHtml(
-              ba.baName || "-"
-            )}
-          </span>
-
-        </div>
-
-
-        <div class="detail-row">
-
-          <span class="label">
-            Store
-          </span>
-
-          <span class="value">
-            ${escapeHtml(
-              ba.storeId || "-"
-            )}
-          </span>
-
-        </div>
-
-
-        <div class="detail-row">
-
-          <span class="label">
-            Status
-          </span>
-
-          <span class="value">
-            ${escapeHtml(
-              result.status || "SUCCESS"
-            )}
-          </span>
-
-        </div>
-
-      </div>
-
-    `;
-
-
-    resultBox.style.display =
-      "block";
-  }
-
-
-  // =========================================================
-  // SHOW ERROR
-  // =========================================================
-
-  function showError(message) {
-
-    const status =
-      document.getElementById("status");
-
-
-    status.className =
-      "status error";
-
-
-    status.textContent =
-      message;
-  }
-
-
-  // =========================================================
-  // STATUS
-  // =========================================================
-
-  function setStatus(
-    message,
-    type
-  ) {
-
-    const status =
-      document.getElementById("status");
-
-
-    status.className =
-      "status";
-
-
-    if (type === "success") {
-
-      status.classList.add(
-        "success"
-      );
+      resultBox.style.display =
+        "block";
 
     }
 
 
-    if (type === "error") {
+    // =========================================================
+    // SHOW ERROR
+    // =========================================================
 
-      status.classList.add(
-        "error"
-      );
+    function showError(message) {
+
+      const status =
+        document.getElementById(
+          "status"
+        );
+
+
+      status.className =
+        "status error";
+
+
+      status.textContent =
+        message;
 
     }
 
 
-    status.textContent =
-      message;
-  }
+    // =========================================================
+    // SET STATUS
+    // =========================================================
+
+    function setStatus(
+      message,
+      type
+    ) {
+
+      const status =
+        document.getElementById(
+          "status"
+        );
 
 
-  // =========================================================
-  // HTML ESCAPE
-  // =========================================================
+      status.className =
+        "status";
 
-  function escapeHtml(value) {
 
-    return String(value)
+      if (type === "success") {
 
-      .replace(/&/g, "&amp;")
+        status.classList.add(
+          "success"
+        );
 
-      .replace(/</g, "&lt;")
+      }
 
-      .replace(/>/g, "&gt;")
 
-      .replace(/"/g, "&quot;")
+      if (type === "error") {
 
-      .replace(/'/g, "&#039;");
+        status.classList.add(
+          "error"
+        );
 
-  }
+      }
 
-</script>
+
+      status.textContent =
+        message;
+
+    }
+
+
+    // =========================================================
+    // HTML ESCAPE
+    // =========================================================
+
+    function escapeHtml(value) {
+
+      return String(value)
+
+        .replace(
+          /&/g,
+          "&amp;"
+        )
+
+        .replace(
+          /</g,
+          "&lt;"
+        )
+
+        .replace(
+          />/g,
+          "&gt;"
+        )
+
+        .replace(
+          /"/g,
+          "&quot;"
+        )
+
+        .replace(
+          /'/g,
+          "&#039;"
+        );
+
+    }
+
+  </script>
 
 </body>
+
 </html>
