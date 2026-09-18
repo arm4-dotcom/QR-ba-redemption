@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <title>QR BA Redemption</title>
+  <title>QR BA Redemption - Idempotency Test</title>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
@@ -29,8 +29,15 @@
 
     h1 {
       font-size: 24px;
-      margin-bottom: 25px;
+      margin-bottom: 10px;
       text-align: center;
+    }
+
+    .test-title {
+      text-align: center;
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 25px;
     }
 
     .status {
@@ -51,15 +58,15 @@
       color: #c62828;
     }
 
-    .detail {
+    .test-box {
       margin-top: 15px;
       padding: 15px;
       background: #fafafa;
       border-radius: 8px;
     }
 
-    .detail-row {
-      margin-bottom: 12px;
+    .test-row {
+      margin-bottom: 14px;
     }
 
     .label {
@@ -73,6 +80,16 @@
       word-break: break-word;
     }
 
+    .passed {
+      color: #2e7d32;
+      font-weight: bold;
+    }
+
+    .failed {
+      color: #c62828;
+      font-weight: bold;
+    }
+
   </style>
 
 </head>
@@ -84,8 +101,12 @@
 
     <h1>QR BA Redemption</h1>
 
+    <div class="test-title">
+      Idempotency / Double Submit Test
+    </div>
+
     <div id="status" class="status">
-      กำลังตรวจสอบข้อมูล...
+      กำลังเริ่มการทดสอบ...
     </div>
 
     <div id="result" style="display:none;"></div>
@@ -99,7 +120,8 @@
     // CONFIG
     // =========================================================
 
-    const LIFF_ID = "2011608815-zoBVWfw9";
+    const LIFF_ID =
+      "2011608815-zoBVWfw9";
 
     const GAS_URL =
       "https://script.google.com/macros/s/AKfycbwkRRQ_KHO3cp7AX4V7N7c7v0Sdoir4oPbacRkm0kQo0WgVNAp18A1bQrxp-5Mly0csEA/exec";
@@ -141,16 +163,19 @@
 
 
         // -------------------------------------------------------
-        // Get LINE ID Token
+        // Get ID Token
         // -------------------------------------------------------
 
-        const idToken = liff.getIDToken();
+        const idToken =
+          liff.getIDToken();
+
 
         if (!idToken) {
 
           throw new Error(
             "ไม่สามารถรับ LINE ID Token ได้"
           );
+
         }
 
 
@@ -173,14 +198,12 @@
 
 
         // -------------------------------------------------------
-        // Create Idempotency Key
+        // IMPORTANT
         // -------------------------------------------------------
         //
-        // 1 transaction attempt = 1 unique key
+        // สร้างเพียง 1 Key
         //
-        // ใช้สำหรับป้องกัน Double Submit / Network Retry
-        //
-        // ไม่ใช้ LINE_USER_ID + CAMPAIGN_ID
+        // แล้วใช้ Key เดิมกับ Request #1 และ #2
         //
         // -------------------------------------------------------
 
@@ -189,100 +212,207 @@
 
 
         console.log(
+          "================================="
+        );
+
+        console.log(
+          "IDEMPOTENCY TEST START"
+        );
+
+        console.log(
           "QR ID:",
           qrId
         );
-
 
         console.log(
           "Campaign ID:",
           campaignId
         );
 
-
         console.log(
           "Idempotency Key:",
           idempotencyKey
         );
 
+        console.log(
+          "================================="
+        );
 
-        // -------------------------------------------------------
-        // Show Processing
-        // -------------------------------------------------------
 
         setStatus(
-          "กำลังดำเนินการรายการ...",
+          "กำลังส่ง Request #1...",
           "normal"
         );
 
 
-        // -------------------------------------------------------
-        // Send Transaction to Google Apps Script
-        // -------------------------------------------------------
+        // =======================================================
+        // REQUEST #1
+        // =======================================================
 
-        const response =
-          await fetch(
-            GAS_URL,
-            {
+        const result1 =
+          await sendTransaction({
 
-              method: "POST",
+            idToken:
+              idToken,
 
-              headers: {
-                "Content-Type":
-                  "text/plain;charset=utf-8"
-              },
+            qrId:
+              qrId,
 
-              body: JSON.stringify({
+            campaignId:
+              campaignId,
 
-                idToken: idToken,
+            idempotencyKey:
+              idempotencyKey
 
-                qrId: qrId,
-
-                campaignId: campaignId,
-
-                idempotencyKey:
-                  idempotencyKey
-
-              })
-
-            }
-          );
-
-
-        // -------------------------------------------------------
-        // Parse Response
-        // -------------------------------------------------------
-
-        const result =
-          await response.json();
+          });
 
 
         console.log(
-          "GAS Response:",
-          result
+          "REQUEST #1 RESULT:",
+          result1
         );
 
 
-        // -------------------------------------------------------
-        // Handle Backend Error
-        // -------------------------------------------------------
-
-        if (!result.success) {
+        if (!result1.success) {
 
           throw new Error(
-            result.message ||
-            result.error ||
-            "ไม่สามารถทำรายการได้"
+            result1.message ||
+            result1.error ||
+            "Request #1 ไม่สำเร็จ"
           );
 
         }
 
 
-        // -------------------------------------------------------
-        // SUCCESS
-        // -------------------------------------------------------
+        setStatus(
+          "Request #1 สำเร็จ — กำลังส่ง Request #2 ด้วย Key เดิม...",
+          "normal"
+        );
 
-        showSuccess(result);
+
+        // =======================================================
+        // REQUEST #2
+        // =======================================================
+        //
+        // สำคัญ:
+        // ใช้ idempotencyKey เดิม
+        //
+        // =======================================================
+
+        const result2 =
+          await sendTransaction({
+
+            idToken:
+              idToken,
+
+            qrId:
+              qrId,
+
+            campaignId:
+              campaignId,
+
+            idempotencyKey:
+              idempotencyKey
+
+          });
+
+
+        console.log(
+          "REQUEST #2 RESULT:",
+          result2
+        );
+
+
+        // =======================================================
+        // VALIDATE TEST
+        // =======================================================
+
+        const sameClaimId =
+          result1.claimId ===
+          result2.claimId;
+
+
+        const request1New =
+          result1.isDuplicate === false;
+
+
+        const request2Duplicate =
+          result2.isDuplicate === true;
+
+
+        const testPassed =
+          sameClaimId &&
+          request1New &&
+          request2Duplicate;
+
+
+        console.log(
+          "================================="
+        );
+
+        console.log(
+          "REQUEST #1:",
+          JSON.stringify(result1)
+        );
+
+        console.log(
+          "REQUEST #2:",
+          JSON.stringify(result2)
+        );
+
+        console.log(
+          "SAME CLAIM ID:",
+          sameClaimId
+        );
+
+        console.log(
+          "REQUEST #1 NEW:",
+          request1New
+        );
+
+        console.log(
+          "REQUEST #2 DUPLICATE:",
+          request2Duplicate
+        );
+
+        console.log(
+          "TEST PASSED:",
+          testPassed
+        );
+
+        console.log(
+          "================================="
+        );
+
+
+        // =======================================================
+        // SHOW RESULT
+        // =======================================================
+
+        showTestResult({
+
+          result1:
+            result1,
+
+          result2:
+            result2,
+
+          sameClaimId:
+            sameClaimId,
+
+          request1New:
+            request1New,
+
+          request2Duplicate:
+            request2Duplicate,
+
+          testPassed:
+            testPassed,
+
+          idempotencyKey:
+            idempotencyKey
+
+        });
 
 
       }
@@ -292,7 +422,7 @@
 
         showError(
           error.message ||
-          "เกิดข้อผิดพลาดในการทำรายการ"
+          "เกิดข้อผิดพลาดในการทดสอบ"
         );
 
       }
@@ -301,10 +431,39 @@
 
 
     // =========================================================
-    // SHOW SUCCESS
+    // SEND TRANSACTION
     // =========================================================
 
-    function showSuccess(result) {
+    async function sendTransaction(data) {
+
+      const response =
+        await fetch(
+          GAS_URL,
+          {
+
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "text/plain;charset=utf-8"
+            },
+
+            body: JSON.stringify(data)
+
+          }
+        );
+
+
+      return await response.json();
+
+    }
+
+
+    // =========================================================
+    // SHOW TEST RESULT
+    // =========================================================
+
+    function showTestResult(data) {
 
       const status =
         document.getElementById(
@@ -318,182 +477,187 @@
         );
 
 
-      status.className =
-        "status success";
+      if (data.testPassed) {
 
+        status.className =
+          "status success";
 
-      status.textContent =
-        "ทำรายการสำเร็จ";
+        status.textContent =
+          "IDEMPOTENCY TEST PASSED";
 
+      }
+      else {
 
-      // -------------------------------------------------------
-      // Campaign
-      // -------------------------------------------------------
+        status.className =
+          "status error";
 
-      const campaign =
-        result.campaign || {};
-
-
-      // -------------------------------------------------------
-      // BA
-      // -------------------------------------------------------
-
-      const ba =
-        result.ba || {};
-
-
-      // -------------------------------------------------------
-      // BA NAME
-      // -------------------------------------------------------
-      //
-      // BA_MASTER ใช้ BA_NAME
-      //
-      // fallback เป็น baName เผื่อ Backend ส่ง camelCase
-      //
-      // -------------------------------------------------------
-
-      const baName =
-        ba.BA_NAME ||
-        ba.baName ||
-        "-";
-
-
-      // -------------------------------------------------------
-      // STORE ID
-      // -------------------------------------------------------
-
-      const storeId =
-        ba.STORE_ID ||
-        ba.storeId ||
-        "-";
-
-
-      // -------------------------------------------------------
-      // Store Name
-      // -------------------------------------------------------
-
-      const storeName =
-        ba.STORE_NAME ||
-        ba.storeName ||
-        "";
-
-
-      // -------------------------------------------------------
-      // Display Store
-      // -------------------------------------------------------
-
-      let storeDisplay =
-        storeId;
-
-
-      if (
-        storeName &&
-        storeName !== "-"
-      ) {
-
-        storeDisplay =
-          storeId +
-          " - " +
-          storeName;
+        status.textContent =
+          "IDEMPOTENCY TEST FAILED";
 
       }
 
 
-      // -------------------------------------------------------
-      // Build Result
-      // -------------------------------------------------------
-
       resultBox.innerHTML = `
 
-        <div class="detail">
+        <div class="test-box">
 
 
-          <div class="detail-row">
+          <div class="test-row">
 
             <span class="label">
-              Claim ID
+              Idempotency Key
             </span>
 
             <span class="value">
               ${escapeHtml(
-                result.claimId || "-"
+                data.idempotencyKey
               )}
             </span>
 
           </div>
 
 
-          <div class="detail-row">
+          <div class="test-row">
 
             <span class="label">
-              Campaign
+              Request #1
             </span>
 
             <span class="value">
+
+              CLAIM ID:
               ${escapeHtml(
-                campaign.campaignName || "-"
+                data.result1.claimId || "-"
               )}
+
+              <br>
+
+              isDuplicate:
+              ${escapeHtml(
+                String(
+                  data.result1.isDuplicate
+                )
+              )}
+
             </span>
 
           </div>
 
 
-          <div class="detail-row">
+          <div class="test-row">
 
             <span class="label">
-              Product
+              Request #2
             </span>
 
             <span class="value">
+
+              CLAIM ID:
               ${escapeHtml(
-                campaign.product || "-"
+                data.result2.claimId || "-"
               )}
+
+              <br>
+
+              isDuplicate:
+              ${escapeHtml(
+                String(
+                  data.result2.isDuplicate
+                )
+              )}
+
             </span>
 
           </div>
 
 
-          <div class="detail-row">
+          <div class="test-row">
 
             <span class="label">
-              BA
+              CLAIM ID เหมือนกัน
             </span>
 
-            <span class="value">
-              ${escapeHtml(
-                baName
-              )}
+            <span class="${
+              data.sameClaimId
+                ? "passed"
+                : "failed"
+            }">
+
+              ${
+                data.sameClaimId
+                  ? "PASS"
+                  : "FAIL"
+              }
+
             </span>
 
           </div>
 
 
-          <div class="detail-row">
+          <div class="test-row">
 
             <span class="label">
-              Store
+              Request #1 สร้างรายการใหม่
             </span>
 
-            <span class="value">
-              ${escapeHtml(
-                storeDisplay
-              )}
+            <span class="${
+              data.request1New
+                ? "passed"
+                : "failed"
+            }">
+
+              ${
+                data.request1New
+                  ? "PASS"
+                  : "FAIL"
+              }
+
             </span>
 
           </div>
 
 
-          <div class="detail-row">
+          <div class="test-row">
 
             <span class="label">
-              Status
+              Request #2 ถูกตรวจพบว่าเป็นรายการซ้ำ
             </span>
 
-            <span class="value">
-              ${escapeHtml(
-                result.status ||
-                "SUCCESS"
-              )}
+            <span class="${
+              data.request2Duplicate
+                ? "passed"
+                : "failed"
+            }">
+
+              ${
+                data.request2Duplicate
+                  ? "PASS"
+                  : "FAIL"
+              }
+
+            </span>
+
+          </div>
+
+
+          <div class="test-row">
+
+            <span class="label">
+              ผลการทดสอบ
+            </span>
+
+            <span class="${
+              data.testPassed
+                ? "passed"
+                : "failed"
+            }">
+
+              ${
+                data.testPassed
+                  ? "IDEMPOTENCY TEST PASSED"
+                  : "IDEMPOTENCY TEST FAILED"
+              }
+
             </span>
 
           </div>
