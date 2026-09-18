@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="th">
 
@@ -215,10 +216,84 @@ function getQRId() {
 
 
 // ============================================================
-// DISPLAY QR INFORMATION
+// GET CAMPAIGN_ID FROM URL
 // ============================================================
 
-function showQRInfo(qrId) {
+function getCampaignId() {
+
+  // ----------------------------------------------------------
+  // 1. อ่าน campaign จาก URL ปกติ
+  // ----------------------------------------------------------
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  const directCampaign =
+    params.get('campaign');
+
+  if (directCampaign) {
+
+    return directCampaign.trim();
+
+  }
+
+
+  // ----------------------------------------------------------
+  // 2. กรณี LINE LIFF เก็บ parameter ไว้ใน liff.state
+  // ----------------------------------------------------------
+
+  const liffState =
+    params.get('liff.state');
+
+  if (liffState) {
+
+    try {
+
+      const decodedState =
+        decodeURIComponent(liffState);
+
+      const stateParams =
+        new URLSearchParams(
+          decodedState
+        );
+
+      const stateCampaign =
+        stateParams.get('campaign');
+
+      if (stateCampaign) {
+
+        return stateCampaign.trim();
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        'Cannot parse campaign from liff.state:',
+        error
+      );
+
+    }
+
+  }
+
+
+  // ----------------------------------------------------------
+  // 3. ไม่พบ Campaign
+  // ----------------------------------------------------------
+
+  return null;
+
+}
+
+
+// ============================================================
+// DISPLAY QR / CAMPAIGN INFORMATION
+// ============================================================
+
+function showQRInfo(qrId, campaignId) {
 
   qrInfoBox.style.display =
     'block';
@@ -226,7 +301,12 @@ function showQRInfo(qrId) {
   qrInfoBox.innerHTML =
 
     '<strong>QR ID:</strong><br>' +
-    qrId;
+    qrId +
+
+    '<br><br>' +
+
+    '<strong>Campaign ID:</strong><br>' +
+    campaignId;
 
 }
 
@@ -240,7 +320,7 @@ async function startLIFF() {
   try {
 
     // --------------------------------------------------------
-    // 1. Initialize LIFF ก่อน
+    // 1. Initialize LIFF
     // --------------------------------------------------------
 
     statusBox.innerText =
@@ -255,7 +335,7 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // 2. อ่าน QR_ID หลัง LIFF init
+    // 2. อ่าน QR_ID
     // --------------------------------------------------------
 
     const qrId =
@@ -279,12 +359,43 @@ async function startLIFF() {
     }
 
 
-    // แสดง QR ที่ตรวจพบ
-    showQRInfo(qrId);
+    // --------------------------------------------------------
+    // 3. อ่าน CAMPAIGN_ID
+    // --------------------------------------------------------
+
+    const campaignId =
+      getCampaignId();
 
 
     // --------------------------------------------------------
-    // 3. ตรวจสอบ Login
+    // ตรวจสอบ CAMPAIGN_ID
+    // --------------------------------------------------------
+
+    if (!campaignId) {
+
+      statusBox.innerText =
+        'ไม่พบ Campaign ID\n\nกรุณาเปิดผ่าน QR Code ของ Campaign ที่ถูกต้อง';
+
+      statusBox.className =
+        'error';
+
+      return;
+
+    }
+
+
+    // --------------------------------------------------------
+    // แสดง QR + Campaign
+    // --------------------------------------------------------
+
+    showQRInfo(
+      qrId,
+      campaignId
+    );
+
+
+    // --------------------------------------------------------
+    // 4. ตรวจสอบ Login
     // --------------------------------------------------------
 
     if (!liff.isLoggedIn()) {
@@ -305,7 +416,7 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // 4. ขอ ID Token
+    // 5. ขอ ID Token
     // --------------------------------------------------------
 
     statusBox.innerText =
@@ -325,7 +436,7 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // 5. ส่ง ID Token + QR_ID ไปยัง GAS
+    // 6. ส่งข้อมูลไปยัง GAS
     // --------------------------------------------------------
 
     statusBox.innerText =
@@ -355,7 +466,10 @@ async function startLIFF() {
                 idToken,
 
               qrId:
-                qrId
+                qrId,
+
+              campaignId:
+                campaignId
 
             }),
 
@@ -368,7 +482,7 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // 6. อ่านผลจาก GAS
+    // 7. อ่านผลจาก GAS
     // --------------------------------------------------------
 
     const result =
@@ -382,7 +496,7 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // 7. ตรวจสอบผล
+    // 8. ตรวจสอบผล
     // --------------------------------------------------------
 
     if (!result.success) {
@@ -390,7 +504,7 @@ async function startLIFF() {
       throw new Error(
 
         result.message ||
-        'Server verification failed'
+        'Server transaction failed'
 
       );
 
@@ -398,11 +512,11 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // 8. แสดงผลสำเร็จ
+    // 9. แสดงผลสำเร็จ
     // --------------------------------------------------------
 
     statusBox.innerText =
-      'ตรวจสอบ LINE User และ QR สำเร็จ';
+      'ทำรายการสำเร็จ';
 
     statusBox.className =
       'success';
@@ -423,7 +537,24 @@ async function startLIFF() {
 
 
     // --------------------------------------------------------
-    // แสดงข้อมูล BA / Store
+    // แสดงข้อมูล Transaction
+    // --------------------------------------------------------
+
+    if (result.claimId) {
+
+      userIdBox.innerHTML +=
+
+        '<br><br>' +
+
+        '<strong>Claim ID</strong><br>' +
+
+        result.claimId;
+
+    }
+
+
+    // --------------------------------------------------------
+    // แสดงข้อมูล BA / Store / Campaign
     // --------------------------------------------------------
 
     if (result.ba) {
@@ -467,6 +598,36 @@ async function startLIFF() {
         '<strong>QR Status:</strong> ' +
         (ba.QR_STATUS || '-');
 
+
+      // ------------------------------------------------------
+      // Campaign information
+      // ------------------------------------------------------
+
+      if (result.campaign) {
+
+        const campaign =
+          result.campaign;
+
+
+        qrInfoBox.innerHTML +=
+
+          '<br><br>' +
+
+          '<strong>Campaign ID:</strong> ' +
+          (campaign.CAMPAIGN_ID || '-') +
+
+          '<br>' +
+
+          '<strong>Campaign Name:</strong> ' +
+          (campaign.CAMPAIGN_NAME || '-') +
+
+          '<br>' +
+
+          '<strong>Product:</strong> ' +
+          (campaign.PRODUCT || '-');
+
+      }
+
     }
 
 
@@ -484,6 +645,16 @@ async function startLIFF() {
       result.ba
     );
 
+    console.log(
+      'Verified Campaign:',
+      result.campaign
+    );
+
+    console.log(
+      'Claim ID:',
+      result.claimId
+    );
+
 
   } catch (error) {
 
@@ -491,25 +662,5 @@ async function startLIFF() {
 
 
     statusBox.innerText =
-      'เกิดข้อผิดพลาด\n\n' +
-      error.message;
-
-    statusBox.className =
-      'error';
-
-  }
-
-}
-
-
-// ============================================================
-// RUN
-// ============================================================
-
-startLIFF();
-
-</script>
-
-</body>
-
-</html>
+      'เกิดข้อผิดพลาด\n\
+```
