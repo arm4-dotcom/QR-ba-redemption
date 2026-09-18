@@ -662,5 +662,25 @@ async function startLIFF() {
 
 
     statusBox.innerText =
-      'เกิดข้อผิดพลาด\n\
+      'เกิดข้อผิดพลาด\n\n' +
+      error.message;
+
+    statusBox.className =
+      'error';
+
+  }
+
+}
+
+
+// ============================================================
+// RUN
+// ============================================================
+
+startLIFF();
+
+</script>
+
+</body>
+
 </html>
