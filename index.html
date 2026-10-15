@@ -180,14 +180,15 @@
           );
 
 
-        const qrId =
-          params.get("qrId") ||
-          "QR01";
+        const qrId = params.get("qrId");
+        const campaignId = params.get("campaignId");
 
-
-        const campaignId =
-          params.get("campaignId") ||
-          "CAMP01";
+        // Do not silently fall back to test IDs.
+        if (!qrId || !campaignId) {
+          throw new Error(
+            "ไม่พบ QR ID หรือ Campaign ID ใน URL กรุณาสแกน QR ที่ถูกต้อง"
+          );
+        }
 
 
         // -------------------------------------------------------
@@ -353,13 +354,17 @@
         // =======================================================
 
         if (!result.success) {
+          const details = [
+            result.message,
+            result.reason ? `Reason: ${result.reason}` : null,
+            result.error ? `Error: ${result.error}` : null
+          ].filter(Boolean);
 
           throw new Error(
-            result.message ||
-            result.error ||
-            "ไม่สามารถทำรายการได้"
+            details.length
+              ? details.join(" | ")
+              : "ไม่สามารถทำรายการได้"
           );
-
         }
 
 
